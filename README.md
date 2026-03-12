@@ -19,7 +19,7 @@
 
 1. 克隆本仓库：
    ```bash
-   git clone https://github.com/yourname/llm-project-reorganizer.git
+   git clone https://github.com/SchrodingerJia/LLM-Project-Reorganizer.git
    cd llm-project-reorganizer
    ```
 
