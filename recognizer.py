@@ -191,7 +191,7 @@ class LLMReorganizer:
 ```
 """
         prompt += f"""
-请确保 JSON 格式正确，路径是相对项目根目录 {os.path.basename(self.config.source_dir)} 的。不要输出任何其他内容。
+请确保 JSON 格式正确，路径是相对项目根目录 {os.path.basename(self.config.source_dir)} 的(不包含根本身)。不要输出任何其他内容。
 
 ### 项目结构（相对路径）：
 {project_structure}

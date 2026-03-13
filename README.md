@@ -87,7 +87,6 @@ config = Config(
    提示词要求 LLM 输出严格的 JSON 格式，包含：
    - `new_structure`：文件重命名映射
    - `modifications`：需要修改的行内容
-   - `deleted_files`：要删除的文件
    - `new_files`：新增的文件（如 README.md）
 
 3. **合并结果**  
@@ -98,7 +97,6 @@ config = Config(
    - 复制未修改的文件
    - 创建新结构的文件（修改或仅重命名）
    - 生成新文件（如 README）
-   - （可选）删除标记的文件
 
 ## ⚠️ 注意事项
 
