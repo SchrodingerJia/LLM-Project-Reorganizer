@@ -21,6 +21,7 @@ class Config:
     base_url: str
     api_key: str
     model: str
+    github_url: str = ''
     max_context_files: int = 6  # 每次最多提交给LLM的文件数，必须为偶数
     max_chat_chars: int = 8000  # 每轮提交给LLM的代码文件字符数上限
     max_file_size: int = 100 * 1024  # 100KB，避免过大文件

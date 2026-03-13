@@ -1,7 +1,7 @@
 # 🤖 LLM 项目重构助手
 
 一个基于大语言模型（LLM）自动分析和重构项目结构的智能工具。  
-它能扫描你的项目文件，理解代码功能，然后重新组织目录、重命名文件、修正导入路径，并生成新的项目结构，让你的代码库更加清晰、模块化。
+它能扫描你的项目文件，理解代码功能，然后重新组织目录、重命名文件、修正导入路径，并生成新的项目结构，让你的代码库更加清晰、模块化，并自动推送至您的 Github 远程仓库（可选）。
 
 ## ✨ 特性
 
@@ -20,7 +20,7 @@
 1. 克隆本仓库：
    ```bash
    git clone https://github.com/SchrodingerJia/LLM-Project-Reorganizer.git
-   cd llm-project-reorganizer
+   cd LLM-Project-Reorganizer
    ```
 
 2. 安装依赖：
@@ -49,10 +49,18 @@ config = Config(
     target_dir=r"YOUR_TARGET_PROJECT_PATH",  # 重构后输出的路径
     base_url=os.getenv("BASE_URL"),          # 从 .env 读取
     api_key=os.getenv("OPENAI_API_KEY"),     # 从 .env 读取
-    model="deepseek-chat"                    # 可更换模型
+    model="deepseek-chat",                   # 可更换模型
+    github_url=''   # 填写则直接推送到 GitHub, 否则请留空
 )
 ```
 然后在 `your_requirement` 变量中描述你的项目背景和重构需求（参考已有注释）。
+
+若您需要同步到 GitHub，请确保：
+- 已安装 `git`，并配置好用户名和邮箱。
+- 在 `main.py` 中填写 `github_url`，如 `https://github.com/YOUR_NAME/YOUR_REPO.git` （最好为空仓库，创建时不添加任何文件如 `README.md`、`.gitignore`、`LICENSE`）。
+- 确保本地有 `git` 权限，或使用 SSH Key 推送。
+
+**请谨慎选择直接推送，LLM有概率犯傻，建议推送前先人工复核**
 
 ### 3. 可选参数调整
 在 `recognizer.py` 的 `Config` 类中可以调整以下高级参数：
@@ -74,6 +82,7 @@ config = Config(
    - 分批调用 LLM，分析并生成重构方案
    - 将重构结果保存到 `reorg_result.json`
    - 根据结果在目标目录重建新项目
+   - （可选）将您的项目推送至指定 Github 仓库
 
 4. 查看输出目录，检查重构后的项目。
 
