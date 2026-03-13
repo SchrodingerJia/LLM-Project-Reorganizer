@@ -78,16 +78,17 @@ class FileManager:
             try:
                 with open(filepath, 'r', encoding=encoding) as f:
                     if filepath.suffix in ('.ipynb'):
-                        lines, file_size = self._ipynb_lines(filepath)
+                        lines = self._ipynb_lines(filepath)
                     else:
                         lines = f.readlines()
-                        file_size = filepath.stat().st_size
 
-                    if nu:
-                        stripped_lines = []
-                        for i, line in enumerate(lines):
-                            if line.strip():
-                                stripped_lines.append(f'line {i}:'+ line.strip())
+                    stripped_lines = []
+                    file_size = 0
+                    for i, line in enumerate(lines):
+                        if line.strip():
+                            content = f'line {i}:'+ line.strip() if nu else line.strip()
+                            stripped_lines.append(content)
+                            file_size += len(content.encode('utf-8'))
                     if file_size > self.config.max_file_size:
                         self._truncate_large_files(stripped_lines, filepath.name)
                     return '\n'.join(stripped_lines)
@@ -107,7 +108,7 @@ class FileManager:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
 
-    def _ipynb_lines(self, notebook_file: Path) -> Tuple[List[str], int]:
+    def _ipynb_lines(self, notebook_file: Path) -> List[str]:
         """Jupyter Notebook 文件提取内容"""
         with open(notebook_file, 'r', encoding='utf-8') as f:
             notebook = json.load(f)
@@ -129,7 +130,7 @@ class FileManager:
                 if isinstance(source, list):
                     source = ''.join(source)
                 content += '```markdown\n'+source+'\n```\n'
-        return content.split('\n'), len(content.encode('utf-8'))
+        return content.split('\n')
     
     def _truncate_large_files(self, lines: List[str], filename: str) -> None:
         """大文件处理：截断"""
@@ -170,9 +171,9 @@ class LLMReorganizer:
 5. 对于辅助文件（如 .json/.csv），若对理解项目至关重要，请保留并重命名；否则可建议删除或忽略。
 6. 输出格式严格遵循如下要求：
 (1) 使用Markdown代码块，以<```json>开头，以<```>结尾.
-(2) 若文件**只需修改名称，内容无需修改**，只需填写new_structure字段，格式为：{"旧文件路径": "新文件路径"}。
-(3) （**尽量少输出这一项，禁止在此处输出完整代码**）若文件内容迫不得已需要修改，请按格式将内容输出到modifications字段中为：{"旧文件路径": [{"修改处的行号(从0开始)": "修改后的新行"}]}。
-(4) 若有新增文件，请将文件内容输出在new_files字段中，格式为：{"文件路径": "文件内容"}。
+(2) 若文件**只需修改名称，内容无需修改**，只需填写new_structure字段，格式为：{"旧文件路径": "新文件路径"}，一对一，一对多时，额外文件放入新建文件中。对于需要删除或忽略的文件，可以通过避免在此处输出实现。
+(3) (**尽量少输出这一项，禁止在此处输出完整代码**) 若文件内容需要局部修改，请按格式将内容输出到modifications字段中为：{"旧文件路径": [{"修改处的行号(从0开始)": "修改后的新行"}]}。
+(4) (**所有完整代码在此输出**) 若有新建的文件，请将文件内容输出在new_files字段中，格式为：{"文件路径": "文件内容"}。
 
 以下是一个输出示例：
 ```json
@@ -190,7 +191,7 @@ class LLMReorganizer:
 ```
 """
         prompt += f"""
-请确保 JSON 格式正确，路径是相对项目根目录 {os.path.basename(self.config.source_dir)} 的。不要输出任何其他内容。！！！永远不要尝试输出完整的全部代码！！！
+请确保 JSON 格式正确，路径是相对项目根目录 {os.path.basename(self.config.source_dir)} 的。不要输出任何其他内容。
 
 ### 项目结构（相对路径）：
 {project_structure}
@@ -271,7 +272,7 @@ class LLMReorganizer:
         # 分批，每次处理 max_files_nums 个文件，为平衡考虑，前一半和后一半分别取 max_files_nums//2 个
         i_aux = 0
         batch_num = len(code_items_front)//(max_files_nums//2) + 1
-        for i in range(0, len(code_items_front), max_files_nums//2):
+        for i in range(0, max(len(code_items_front),1), max_files_nums//2):
             final_flag = i + max_files_nums//2 >= len(code_items_front)
             if final_flag:
                 batch_code = code_items_front[i:] + code_items_back[i:]
@@ -294,6 +295,7 @@ class LLMReorganizer:
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.2,
+                    timeout=(len(prompt)//10000*10+10)*60,
                     stream=True
                 )
 
@@ -428,7 +430,7 @@ class ProjectBuilder:
                         except ValueError:
                             self.logger.error(f"Invalid line number in {old_path}: {line_num}. Modification skipped.")
                 self.fm.write_file(new_full, '\n'.join(content))
-                self.logger.info(f"Created/updated: {new_path}")
+                self.logger.info(f"Updated: {new_path}")
             else:
                 # 仅重命名，内容不变
                 if old_full.exists():
