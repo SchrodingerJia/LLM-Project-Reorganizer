@@ -1,7 +1,7 @@
 import logging
 import os
 import json
-from recognizer import Config, FileManager, LLMReorganizer, ProjectBuilder
+from reorgnizer import Config, FileManager, LLMReorganizer, ProjectBuilder
 from uploader import GitHubPusher
 
 def main():

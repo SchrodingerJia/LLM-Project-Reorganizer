@@ -63,7 +63,7 @@ config = Config(
 **请谨慎选择直接推送，LLM有概率犯傻，建议推送前先人工复核**
 
 ### 3. 可选参数调整
-在 `recognizer.py` 的 `Config` 类中可以调整以下高级参数：
+在 `reorgnizer.py` 的 `Config` 类中可以调整以下高级参数：
 - `max_context_files`：每批最多提交的文件数（必须为偶数）
 - `max_chat_chars`：每批提交的字符数上限
 - `max_file_size`：单个文件允许的最大大小（过大则截断）
