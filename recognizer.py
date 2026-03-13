@@ -23,11 +23,12 @@ class Config:
     model: str
     max_context_files: int = 6  # 每次最多提交给LLM的文件数，必须为偶数
     max_chat_chars: int = 8000  # 每轮提交给LLM的代码文件字符数上限
-    max_file_chars: int = 400  # 每文件最大读取字符数
-    code_extensions: Tuple = ('.py', '.c', '.java', '.ipynb', '.js', '.cpp', '.h', '.cs')
+    max_file_size: int = 100 * 1024  # 100KB，避免过大文件
+    code_extensions: Tuple = ('.py', '.c', '.java', '.ipynb', '.js', '.cpp', '.h', '.cs', '.v', '.xdc')
     aux_extensions: Tuple = ('.json', '.csv', '.xlsx', '.txt', '.yaml', '.yml', '.md', '.xls')
     skip_extensions: Tuple = ('.pyc', '.log', '.tmp', '.DS_Store', '.git', '__pycache__', '.o', '.exe')
-    max_file_size: int = 100 * 1024  # 100KB，避免过大文件
+    source_extensions: Tuple = ('.docx', '.doc', '.pdf', '.zip', '.rar', '.pptx', '.ppt', '.png', '.jpg')
+    skip_extensions = (*skip_extensions, *source_extensions)
 
     def __post_init__(self):
         if not self.api_key:
@@ -39,7 +40,7 @@ class Config:
 # 📁 文件系统工具
 # ============================
 class FileManager:
-    ENCODINGS = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'latin-1']
+    ENCODINGS = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'latin-1']    # 支持的编码格式
     def __init__(self, config: Config):
         self.config = config
         self.logger = logging.getLogger(__name__)
@@ -76,17 +77,23 @@ class FileManager:
         for encoding in self.ENCODINGS:
             try:
                 with open(filepath, 'r', encoding=encoding) as f:
-                    content = f.read()
-                    file_size = filepath.stat().st_size
+                    if filepath.suffix in ('.ipynb'):
+                        lines, file_size = self._ipynb_lines(filepath)
+                    else:
+                        lines = f.readlines()
+                        file_size = filepath.stat().st_size
+
+                    if nu:
+                        stripped_lines = []
+                        for i, line in enumerate(lines):
+                            if line.strip():
+                                stripped_lines.append(f'line {i}:'+ line.strip())
                     if file_size > self.config.max_file_size:
-                        truncated = content[:self.config.max_file_chars]
-                        truncated += f"\n\n<!-- (large file: {file_size} bytes) -->"
-                        self.logger.warning(f"Truncated large file ({filepath} {file_size} bytes → {len(truncated)} chars)")
-                        return '\n'.join([f'line {i}:'+ line for i, line in enumerate(truncated.split('\n'))]) if nu else truncated
-                    return '\n'.join([f'line {i}:'+ line for i, line in enumerate(content.split('\n'))]) if nu else content 
-            except Exception as e:
+                        self._truncate_large_files(stripped_lines, filepath.name)
+                    return '\n'.join(stripped_lines)
+            except UnicodeDecodeError:
                 continue
-        self.logger.warning(f"Error reading {filepath}: {e}")
+        self.logger.warning(f"Error reading {filepath}: Unsupported encoding.")
         return None
         
     def write_file(self, filepath: Path, content: str):
@@ -99,6 +106,42 @@ class FileManager:
         """复制文件，确保父目录存在"""
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
+
+    def _ipynb_lines(self, notebook_file: Path) -> Tuple[List[str], int]:
+        """Jupyter Notebook 文件提取内容"""
+        with open(notebook_file, 'r', encoding='utf-8') as f:
+            notebook = json.load(f)
+
+        content = ''
+        for cell in notebook['cells']:
+            if cell['cell_type'] == 'code':
+                source = cell['source']
+                if not source:
+                    continue
+                # source 可能是字符串列表，也可能是单一字符串
+                if isinstance(source, list):
+                    source = ''.join(source)
+                content += '```python\n'+source+'\n```\n'
+            elif cell['cell_type'] == 'markdown':
+                source = cell['source']
+                if not source:
+                    continue
+                if isinstance(source, list):
+                    source = ''.join(source)
+                content += '```markdown\n'+source+'\n```\n'
+        return content.split('\n'), len(content.encode('utf-8'))
+    
+    def _truncate_large_files(self, lines: List[str], filename: str) -> None:
+        """大文件处理：截断"""
+        total_size = 0
+        i = 0
+        while total_size < self.config.max_file_size:
+            total_size += len(lines[i].encode('utf-8'))
+            i += 1
+        lines = lines[:i]
+        hidden_size = len('\n'.join(lines[i:]).encode('utf-8'))
+        lines.append(f"\n\n<!-- {hidden_size} bytes more -->")
+        self.logger.info(f"Truncated {filename} to {len(lines)} lines")
 
 # ============================
 # 🧠 LLM 交互模块
@@ -161,7 +204,7 @@ class LLMReorganizer:
         if results["new_structure"]:
             prompt += f'''\n当前处理结果如下，参考已处理的部分，给出原有基础上修改或新增的部分，保持一致的部分不要输出：\n{results}'''
         if final_flag:
-            prompt += "\n\n**注意：** 这是最后一批文件，请完成所有修改并给出最终版README.md文件(最好使用中文完成)。必要时给出requirements.txt等文件。"
+            prompt += "\n\n**注意：** 这是最后一批文件，请完成所有修改并给出最终版README.md文件(最好使用中文完成，用于介绍这一项目，包括项目结构、功能、使用方法等)。必要时给出requirements.txt等文件。"
         else:
             prompt += "\n\n若你没有收到你是**最后一批文件**的提示，不要添加README。"
         return prompt
@@ -342,7 +385,7 @@ class ProjectBuilder:
         final_results["deleted_files"] = [Path(f) for f in reorganization_result["deleted_files"]]
         final_results["new_files"] = {Path(old_path): content for old_path, content in reorganization_result["new_files"].items()}
         reorganization_result = final_results
-        
+
         source_root = Path(self.config.source_dir)
         target_root = Path(self.config.target_dir)
         target_root.mkdir(parents=True, exist_ok=True)

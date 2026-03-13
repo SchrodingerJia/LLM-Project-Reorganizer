@@ -58,7 +58,7 @@ config = Config(
 在 `recognizer.py` 的 `Config` 类中可以调整以下高级参数：
 - `max_context_files`：每批最多提交的文件数（必须为偶数）
 - `max_chat_chars`：每批提交的字符数上限
-- `max_file_chars`：单个文件读取的最大字符数（过长则截断）
+- `max_file_size`：单个文件允许的最大大小（过大则截断）
 - `code_extensions` / `aux_extensions`：识别代码文件和辅助文件的扩展名
 - `skip_extensions`：跳过的文件/文件夹（如 `.pyc`, `__pycache__`）
 
@@ -115,3 +115,8 @@ MIT License
 ---
 
 欢迎提交 Issue 和 PR，一起改进这个智能重构工具！
+
+## 📝 优化方向
+
+- **文件上传**：优化文件内容筛选。
+- **提示词优化**：少部分情况下LLM尝试输出完整代码块，待解决。
