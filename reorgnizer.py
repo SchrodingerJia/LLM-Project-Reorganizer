@@ -382,11 +382,15 @@ class ProjectBuilder:
             "new_files": {}
         }
         for old_path, new_path in reorganization_result["new_structure"].items():
+            if old_path.startswith(os.path.basename(self.config.source_dir)):
+                old_path = old_path[len(os.path.basename(self.config.source_dir)) + 1:]
             final_results["new_structure"][Path(old_path)] = Path(new_path)
         for old_path, modification in reorganization_result["modifications"].items():
+            if old_path.startswith(os.path.basename(self.config.source_dir)):
+                old_path = old_path[len(os.path.basename(self.config.source_dir)) + 1:]
             final_results["modifications"][Path(old_path)] = modification
         final_results["deleted_files"] = [Path(f) for f in reorganization_result["deleted_files"]]
-        final_results["new_files"] = {Path(old_path): content for old_path, content in reorganization_result["new_files"].items()}
+        final_results["new_files"] = {Path(new_path): content for new_path, content in reorganization_result["new_files"].items()}
         reorganization_result = final_results
 
         source_root = Path(self.config.source_dir)
