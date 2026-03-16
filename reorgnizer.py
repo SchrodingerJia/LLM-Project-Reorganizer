@@ -25,7 +25,7 @@ class Config:
     max_context_files: int = 6  # 每次最多提交给LLM的文件数，必须为偶数
     max_chat_chars: int = 8000  # 每轮提交给LLM的代码文件字符数上限
     max_file_size: int = 100 * 1024  # 100KB，避免过大文件
-    code_extensions: Tuple = ('.py', '.c', '.java', '.ipynb', '.js', '.cpp', '.h', '.cs', '.v', '.xdc')
+    code_extensions: Tuple = ('.py', '.c', '.java', '.ipynb', '.js', '.cpp', '.h', '.cs', '.v', '.xdc', '.m')
     aux_extensions: Tuple = ('.json', '.csv', '.xlsx', '.txt', '.yaml', '.yml', '.md', '.xls')
     skip_extensions: Tuple = ('.pyc', '.log', '.tmp', '.DS_Store', '.git', '__pycache__', '.o', '.exe')
     source_extensions: Tuple = ('.docx', '.doc', '.pdf', '.zip', '.rar', '.pptx', '.ppt', '.png', '.jpg')
@@ -85,11 +85,13 @@ class FileManager:
 
                     stripped_lines = []
                     file_size = 0
-                    for i, line in enumerate(lines):
+                    i = 0
+                    for line in lines:
                         if line.strip():
-                            content = f'line {i}:'+ line.strip() if nu else line.strip()
+                            content = f'line {i}:'+ line.rstrip() if nu else line.rstrip()
                             stripped_lines.append(content)
                             file_size += len(content.encode('utf-8'))
+                            i += 1
                     if file_size > self.config.max_file_size:
                         self._truncate_large_files(stripped_lines, filepath.name)
                     return '\n'.join(stripped_lines)
@@ -430,7 +432,7 @@ class ProjectBuilder:
                 for modification in reorganization_result["modifications"][old_path if old_flag else new_path]:
                     for line_num, new_content in modification.items():
                         try:
-                            line = int(line_num[-1]) if type(line_num) == str else line_num
+                            line = int(line_num.replace('line', '')) if type(line_num) == str else line_num
                             content[line] = new_content
                         except ValueError:
                             self.logger.error(f"Invalid line number in {old_path}: {line_num}. Modification skipped.")
