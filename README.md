@@ -34,6 +34,8 @@
    依赖包括：
    - `openai`（LLM 接口）
    - `python-dotenv`（环境变量管理）
+   - `pandas`（数据处理，可选）
+   - `openpyxl`（Excel 读取，可选）
 
 ## ⚙️ 配置
 

@@ -29,7 +29,7 @@ class Config:
     code_extensions: Tuple = ('.py', '.c', '.java', '.ipynb', '.js', '.cpp', '.h', '.cs', '.v', '.xdc', '.m')
     aux_extensions: Tuple = ('.json', '.csv', '.xlsx', '.txt', '.yaml', '.yml', '.md', '.xls')
     skip_extensions: Tuple = ('.pyc', '.log', '.tmp', '.DS_Store', '.git', '__pycache__', '.o', '.exe')
-    source_extensions: Tuple = ('.docx', '.doc', '.pdf', '.zip', '.rar', '.pptx', '.ppt', '.png', '.jpg')
+    source_extensions: Tuple = ('.docx', '.doc', '.pdf', '.zip', '.rar', '.pptx', '.ppt', '.png', '.jpg', '.svg')
     skip_extensions = (*skip_extensions, *source_extensions)
 
     def __post_init__(self):
@@ -79,10 +79,13 @@ class FileManager:
         for encoding in self.ENCODINGS:
             try:
                 with open(filepath, 'r', encoding=encoding) as f:
-                    if filepath.suffix in ('.ipynb'):
-                        lines = self._ipynb_lines(filepath)
-                    else:
-                        lines = f.readlines()
+                    match filepath.suffix:
+                        case '.ipynb':
+                            lines = self._ipynb_lines(filepath)
+                        case '.xlsx' | '.xls':
+                            lines = self._excel_lines(filepath)
+                        case _:
+                            lines = f.readlines()
 
                     stripped_lines = []
                     file_size = 0
@@ -134,6 +137,13 @@ class FileManager:
                 if isinstance(source, list):
                     source = ''.join(source)
                 content += '```markdown\n'+source+'\n```\n'
+        return content.split('\n')
+    
+    def _excel_lines(self, excel_file: Path, head: int = 10) -> List[str]:
+        """Excel 文件提取内容"""
+        import pandas as pd
+        df = pd.read_excel(excel_file)
+        content = df.head(head).to_string(index=False)
         return content.split('\n')
     
     def _truncate_large_files(self, lines: List[str], filename: str) -> None:
