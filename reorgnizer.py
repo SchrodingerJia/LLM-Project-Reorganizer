@@ -1,5 +1,6 @@
 import os
 import re
+import math
 import shutil
 import json
 import logging
@@ -274,7 +275,7 @@ class LLMReorganizer:
 
         # 分批，每次处理 max_files_nums 个文件，为平衡考虑，前一半和后一半分别取 max_files_nums//2 个
         i_aux = 0
-        batch_num = len(code_items_front)//(max_files_nums//2) + 1
+        batch_num = math.ceil(len(code_items_front)/(max_files_nums//2))
         for i in range(0, max(len(code_items_front),1), max_files_nums//2):
             final_flag = i + max_files_nums//2 >= len(code_items_front)
             if final_flag:
@@ -283,6 +284,7 @@ class LLMReorganizer:
             else:
                 batch_code = code_items_front[i:i+max_files_nums//2] + code_items_back[i:i+max_files_nums//2]
                 batch_aux = aux_items[i_aux:i_aux+len(aux_items)//(len(code_items_front)//(max_files_nums//2)+1)]
+                i_aux += len(aux_items)//(len(code_items_front)//(max_files_nums//2)+1)
             
             batch_code = {path: content for path, content in batch_code}
             batch_aux = {path: content for path, content in batch_aux}
