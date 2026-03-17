@@ -28,8 +28,8 @@ class Config:
     max_file_size: int = 100 * 1024  # 100KB，避免过大文件
     code_extensions: Tuple = ('.py', '.c', '.java', '.ipynb', '.js', '.cpp', '.h', '.cs', '.v', '.xdc', '.m')
     aux_extensions: Tuple = ('.json', '.csv', '.xlsx', '.txt', '.yaml', '.yml', '.md', '.xls')
-    skip_extensions: Tuple = ('.pyc', '.log', '.tmp', '.DS_Store', '.git', '__pycache__', '.o', '.exe')
-    source_extensions: Tuple = ('.docx', '.doc', '.pdf', '.zip', '.rar', '.pptx', '.ppt', '.png', '.jpg', '.svg')
+    skip_extensions: Tuple = ('.pyc', '.log', '.tmp', '.DS_Store', '.git', '__pycache__', '.o', '.exe', '.class')
+    source_extensions: Tuple = ('.docx', '.doc', '.pdf', '.zip', '.rar', '.pptx', '.ppt', '.png', '.jpg', '.svg', '.mp4')
     skip_extensions = (*skip_extensions, *source_extensions)
 
     def __post_init__(self):
@@ -42,7 +42,8 @@ class Config:
 # 📁 文件系统工具
 # ============================
 class FileManager:
-    ENCODINGS = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'latin-1']    # 支持的编码格式
+    ENCODINGS = ['gbk', 'utf-8', 'gb2312', 'gb18030', 'big5', 'latin-1']    # 支持的编码格式
+    HEADLINES = 10  # 辅助文件开头显示的行数
     def __init__(self, config: Config):
         self.config = config
         self.logger = logging.getLogger(__name__)
@@ -83,7 +84,9 @@ class FileManager:
                         case '.ipynb':
                             lines = self._ipynb_lines(filepath)
                         case '.xlsx' | '.xls':
-                            lines = self._excel_lines(filepath)
+                            lines = self._excel_lines(filepath, self.HEADLINES)
+                        case '.csv':
+                            lines = f.readlines()[:self.HEADLINES]
                         case _:
                             lines = f.readlines()
 
@@ -258,8 +261,8 @@ class LLMReorganizer:
         aux_files = {str(f.relative_to(self.config.source_dir)): fm.read_file_content(f,nu=True) for f in files['aux']}
 
         # 总文件大小
-        total_code_chars = sum(len(v) for v in code_files.values())
-        total_aux_chars = sum(len(v) for v in aux_files.values())
+        total_code_chars = sum((len(v) if v else 0) for v in code_files.values())
+        total_aux_chars = sum((len(v) if v else 0) for v in aux_files.values())
         max_files_nums = self.config.max_chat_chars//int((total_code_chars+total_aux_chars)/(len(code_files)+len(aux_files)))//2*2
         max_files_nums = max_files_nums if max_files_nums > 0 else 2
         max_files_nums = min(max_files_nums, self.config.max_context_files)
@@ -293,8 +296,12 @@ class LLMReorganizer:
                 batch_aux = aux_items[i_aux:]
             else:
                 batch_code = code_items_front[i:i+max_files_nums//2] + code_items_back[i:i+max_files_nums//2]
-                batch_aux = aux_items[i_aux:i_aux+len(aux_items)//(len(code_items_front)//(max_files_nums//2)+1)]
-                i_aux += len(aux_items)//(len(code_items_front)//(max_files_nums//2)+1)
+                # 若代码文件过大，不再添加辅助文件
+                if sum((len(v) if v else 0) for _,v in batch_code) > self.config.max_chat_chars//2:
+                    batch_aux = []
+                else:
+                    batch_aux = aux_items[i_aux:i_aux+len(aux_items)//(len(code_items_front)//(max_files_nums//2)+1)]
+                    i_aux += len(aux_items)//(len(code_items_front)//(max_files_nums//2)+1)
             
             batch_code = {path: content for path, content in batch_code}
             batch_aux = {path: content for path, content in batch_aux}
