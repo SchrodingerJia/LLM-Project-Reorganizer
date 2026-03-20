@@ -26,7 +26,7 @@ class Config:
     max_context_files: int = 6  # 每次最多提交给LLM的文件数，必须为偶数
     max_chat_chars: int = 8000  # 每轮提交给LLM的代码文件字符数上限
     max_file_size: int = 100 * 1024  # 100KB，避免过大文件
-    code_extensions: Tuple = ('.py', '.c', '.java', '.ipynb', '.js', '.cpp', '.h', '.cs', '.v', '.xdc', '.m')
+    code_extensions: Tuple = ('.py', '.c', '.java', '.ipynb', '.js', '.cpp', '.h', '.cs', '.v', '.xdc', '.m', '.Rmd', '.R')
     aux_extensions: Tuple = ('.json', '.csv', '.xlsx', '.txt', '.yaml', '.yml', '.md', '.xls')
     skip_extensions: Tuple = ('.pyc', '.log', '.tmp', '.DS_Store', '.git', '__pycache__', '.o', '.exe', '.class')
     source_extensions: Tuple = ('.docx', '.doc', '.pdf', '.zip', '.rar', '.pptx', '.ppt', '.png', '.jpg', '.svg', '.mp4')
@@ -288,7 +288,7 @@ class LLMReorganizer:
 
         # 分批，每次处理 max_files_nums 个文件，为平衡考虑，前一半和后一半分别取 max_files_nums//2 个
         i_aux = 0
-        batch_num = math.ceil(len(code_items_front)/(max_files_nums//2))
+        batch_num = max(math.ceil(len(code_items_front)/(max_files_nums//2)), 1)
         for i in range(0, max(len(code_items_front),1), max_files_nums//2):
             final_flag = i + max_files_nums//2 >= len(code_items_front)
             if final_flag:
@@ -323,7 +323,7 @@ class LLMReorganizer:
 
                 raw_response = ""
                 for chunk in stream:
-                    content = chunk.choices[0].delta.content
+                    content = chunk.choices[0].delta.content if chunk.choices else None
                     if content is not None:
                         raw_response += content
                         print(content, end="", flush=True)
