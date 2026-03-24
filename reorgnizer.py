@@ -408,11 +408,11 @@ class ProjectBuilder:
             "new_files": {}
         }
         for old_path, new_path in reorganization_result["new_structure"].items():
-            if old_path.startswith(os.path.basename(self.config.source_dir)):
+            if old_path.startswith(os.path.basename(self.config.source_dir)+'/'):
                 old_path = old_path[len(os.path.basename(self.config.source_dir)) + 1:]
             final_results["new_structure"][Path(old_path)] = Path(new_path)
         for old_path, modification in reorganization_result["modifications"].items():
-            if old_path.startswith(os.path.basename(self.config.source_dir)):
+            if old_path.startswith(os.path.basename(self.config.source_dir)+'/'):
                 old_path = old_path[len(os.path.basename(self.config.source_dir)) + 1:]
             final_results["modifications"][Path(old_path)] = modification
         final_results["deleted_files"] = [Path(f) for f in reorganization_result["deleted_files"]]
@@ -431,12 +431,12 @@ class ProjectBuilder:
         files_to_skip = set()
         directories_to_skip = set()
         for old_path in reorganization_result["new_structure"].keys():
-            if old_path.is_file():
+            if '.' in str(old_path):
                 files_to_skip.add(old_path)
             else:
                 directories_to_skip.add(old_path)
         for file in reorganization_result["deleted_files"]:
-            if file.is_file():
+            if '.' in str(old_path):
                 files_to_skip.add(file)
             else:
                 directories_to_skip.add(file)
@@ -449,8 +449,8 @@ class ProjectBuilder:
                     if parent in directories_to_skip:
                         break
                 else:
-                    if (rel_path not in files_to_skip
-                        and f.suffix not in self.config.skip_extensions):
+                    if (rel_path not in files_to_skip and 
+                        f.suffix not in self.config.skip_extensions):
                         dst = target_root / rel_path
                         self.fm.copy_file(f, dst)
                         self.logger.info(f"Copied untouched file: {rel_path}")
@@ -470,7 +470,7 @@ class ProjectBuilder:
                         try:
                             line = int(line_num.replace('line', '')) if type(line_num) == str else line_num
                             content[line] = new_content
-                        except ValueError:
+                        except Exception:
                             self.logger.error(f"Invalid line number in {old_path}: {line_num}. Modification skipped.")
                 self.fm.write_file(new_full, '\n'.join(content))
                 self.logger.info(f"Updated: {new_path}")
