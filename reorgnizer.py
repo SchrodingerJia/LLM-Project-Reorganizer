@@ -118,6 +118,11 @@ class FileManager:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
 
+    def copy_dir(self, src: Path, dst: Path):
+        """复制目录，确保父目录存在"""
+        shutil.rmtree(dst, ignore_errors=True)
+        shutil.copytree(src, dst)
+
     def _ipynb_lines(self, notebook_file: Path) -> List[str]:
         """Jupyter Notebook 文件提取内容"""
         with open(notebook_file, 'r', encoding='utf-8') as f:
@@ -421,22 +426,34 @@ class ProjectBuilder:
         # 1. 删除目标文件夹中旧文件（可选，谨慎）
         # shutil.rmtree(target_root, ignore_errors=True)
         # target_root.mkdir()
-
+        
         # 2. 复制未修改的文件（other）
         files_to_skip = set()
+        directories_to_skip = set()
         for old_path in reorganization_result["new_structure"].keys():
-            files_to_skip.add(old_path)
+            if old_path.is_file():
+                files_to_skip.add(old_path)
+            else:
+                directories_to_skip.add(old_path)
         for file in reorganization_result["deleted_files"]:
-            files_to_skip.add(file)
+            if file.is_file():
+                files_to_skip.add(file)
+            else:
+                directories_to_skip.add(file)
 
         # 复制未参与重构的文件
         for f in Path(self.config.source_dir).rglob("*"):
             if f.is_file():
                 rel_path = f.relative_to(source_root)
-                if rel_path not in files_to_skip and f.suffix not in self.config.skip_extensions:
-                    dst = target_root / rel_path
-                    self.fm.copy_file(f, dst)
-                    self.logger.info(f"Copied untouched file: {rel_path}")
+                for parent in f.relative_to(source_root).parents:
+                    if parent in directories_to_skip:
+                        break
+                else:
+                    if (rel_path not in files_to_skip
+                        and f.suffix not in self.config.skip_extensions):
+                        dst = target_root / rel_path
+                        self.fm.copy_file(f, dst)
+                        self.logger.info(f"Copied untouched file: {rel_path}")
 
         # 3. 创建新结构的文件
         for old_path, new_path in reorganization_result["new_structure"].items():
@@ -457,11 +474,14 @@ class ProjectBuilder:
                             self.logger.error(f"Invalid line number in {old_path}: {line_num}. Modification skipped.")
                 self.fm.write_file(new_full, '\n'.join(content))
                 self.logger.info(f"Updated: {new_path}")
-            else:
+            elif Path(old_full).is_dir():
+                # 仅创建目录
+                self.fm.copy_dir(old_full, new_full)
+                self.logger.info(f"Renamed directory: {old_path} -> {new_path}")
+            elif old_full.exists():
                 # 仅重命名，内容不变
-                if old_full.exists():
-                    self.fm.copy_file(old_full, new_full)
-                    self.logger.info(f"Renamed file: {old_path} -> {new_path}")
+                self.fm.copy_file(old_full, new_full)
+                self.logger.info(f"Renamed file: {old_path} -> {new_path}")
 
         # 4. 删除文件（可选，根据需求）
         # for del_file in reorganization_result["deleted_files"]:
